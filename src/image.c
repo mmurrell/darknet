@@ -456,7 +456,7 @@ void show_image_cv(image p, const char *name)
 		}
 
 		cvWriteFrame(output_video, disp);
-		printf("\n cvWriteFrame \n");
+		//printf("\n cvWriteFrame \n");
 	}
 
     cvReleaseImage(&disp);
@@ -465,6 +465,7 @@ void show_image_cv(image p, const char *name)
 
 void show_image(image p, const char *name)
 {
+	if (!p.data)return;
 #ifdef OPENCV
     show_image_cv(p, name);
 #else
