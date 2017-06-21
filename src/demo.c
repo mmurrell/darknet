@@ -12,6 +12,8 @@
 #include <winsock.h>
 #include "gettimeofday.h"
 
+#include <Windows.h>
+
 #define FRAMES 3
 
 #ifdef OPENCV
@@ -42,63 +44,69 @@ static float *avg;
 
 static pthread_mutex_t mattex;
 
-
-void *fetch_in_thread(void *ptr)
-{
-    in = get_image_from_stream(cap);
-    if(!in.data){
-        error("Stream closed.");
-    }
-    in_s = resize_image(in, net.w, net.h);
-    return 0;
-}
-
-void *detect_in_thread(void *ptr)
-{
-    float nms = .4;
-
-    layer l = net.layers[net.n-1];
-    float *X = det_s.data;
-    float *prediction = network_predict(net, X);
-
-    memcpy(predictions[demo_index], prediction, l.outputs*sizeof(float));
-    mean_arrays(predictions, FRAMES, l.outputs, avg);
-    l.output = avg;
-
-    free_image(det_s);
-    if(l.type == DETECTION){
-        get_detection_boxes(l, 1, 1, demo_thresh, probs, boxes, 0);
-    } else if (l.type == REGION){
-        get_region_boxes(l, 1, 1, demo_thresh, probs, boxes, 0, 0);
-    } else {
-        error("Last layer must produce detections\n");
-    }
-    if (nms > 0) do_nms(boxes, probs, l.w*l.h*l.n, l.classes, nms);
-    //printf("\033[2J");
-    //printf("\033[1;1H");
-    //printf("\nFPS:%.1f\n",fps);
-    //printf("Objects:\n\n");
-
-    images[demo_index] = det;
-    det = images[(demo_index + FRAMES/2 + 1)%FRAMES];
-    demo_index = (demo_index + 1)%FRAMES;
-
-    draw_detections(det, l.w*l.h*l.n, demo_thresh, boxes, probs, demo_names, demo_alphabet, demo_classes);
-
-    return 0;
-}
-
-double get_wall_time()
-{
-    struct timeval time;
-    if (gettimeofday(&time,NULL)){
-        return 0;
-    }
-    return (double)time.tv_sec + (double)time.tv_usec * .000001;
-}
+static int exit_pending = 0;
 
 const char* win1 = "Instream";
 const char* win2 = "Detected";
+
+double get_wall_time()
+{
+	struct timeval time;
+	if (gettimeofday(&time, NULL)) {
+		return 0;
+	}
+	return (double)time.tv_sec + (double)time.tv_usec * .000001;
+}
+
+void fetch() {
+}
+void detect() {
+	Sleep(500);
+	while (!exit_pending) {
+		pthread_mutex_lock(&mattex);
+		det = in;
+		pthread_mutex_unlock(&mattex);
+		det_s = resize_image(in, net.w, net.h);
+
+
+		float nms = .4;
+
+		layer l = net.layers[net.n - 1];
+		float *X = det_s.data;
+		float *prediction = network_predict(net, X);
+
+		memcpy(predictions[demo_index], prediction, l.outputs * sizeof(float));
+		mean_arrays(predictions, FRAMES, l.outputs, avg);
+		l.output = avg;
+
+		free_image(det_s);
+		if (l.type == DETECTION) {
+			get_detection_boxes(l, 1, 1, demo_thresh, probs, boxes, 0);
+		}
+		else if (l.type == REGION) {
+			get_region_boxes(l, 1, 1, demo_thresh, probs, boxes, 0, 0);
+		}
+		else {
+			error("Last layer must produce detections\n");
+		}
+
+		if (nms > 0) do_nms(boxes, probs, l.w*l.h*l.n, l.classes, nms);
+
+		printf("\033[2J");
+		printf("\033[1;1H");
+		printf("\nFPS:%.1f\n", fps);
+		printf("Objects:\n\n");
+
+		images[demo_index] = det;
+		//det = images[(demo_index + FRAMES / 2 + 1) % FRAMES];
+		demo_index = (demo_index + 1) % FRAMES;
+
+		draw_detections(det, l.w*l.h*l.n, demo_thresh, boxes, probs, demo_names, demo_alphabet, demo_classes);
+
+	}
+}
+
+
 void demo(char *cfgfile, char *weightfile, float thresh, int cam_index, const char *filename, char **names, int classes, int frame_skip, char *prefix)
 {
     //skip = frame_skip;
@@ -116,8 +124,9 @@ void demo(char *cfgfile, char *weightfile, float thresh, int cam_index, const ch
     set_batch_network(&net, 1);
 
     srand(2222222);
-
-    if(filename){
+	
+	//filename = "small.mp4";
+	if(filename){
         printf("video file: %s\n", filename);
         cap = cvCaptureFromFile(filename);
     }else{
@@ -127,14 +136,13 @@ void demo(char *cfgfile, char *weightfile, float thresh, int cam_index, const ch
 
     if(!cap) error("Couldn't connect to webcam.\n");
 
-	double target_framerate = cvGetCaptureProperty(cap, CV_CAP_PROP_FPS);
-	printf("\nCapture Stream FPS:%.1f          ", target_framerate);
+	//double target_framerate = cvGetCaptureProperty(cap, CV_CAP_PROP_FPS);
+	//printf("\nCapture Stream FPS:%.1f          ", target_framerate);
 
 
     layer l = net.layers[net.n-1];
     int j;
 
-	/* 
 	avg =(float *) calloc(l.outputs, sizeof(float));
     for(j = 0; j < FRAMES; ++j) predictions[j] = (float *) calloc(l.outputs, sizeof(float));
     for(j = 0; j < FRAMES; ++j) images[j] = make_image(1,1,3);
@@ -142,6 +150,7 @@ void demo(char *cfgfile, char *weightfile, float thresh, int cam_index, const ch
     boxes = (box *)calloc(l.w*l.h*l.n, sizeof(box));
     probs = (float **)calloc(l.w*l.h*l.n, sizeof(float *));
     for(j = 0; j < l.w*l.h*l.n; ++j) probs[j] = (float *)calloc(l.classes, sizeof(float *));
+	/*
 
 	fetch_in_thread(0);
     det = in;
@@ -168,16 +177,14 @@ void demo(char *cfgfile, char *weightfile, float thresh, int cam_index, const ch
 
     int count = 0;
     if(showWindow){
-		cvNamedWindow(win1, CV_WINDOW_NORMAL);
-		cvMoveWindow(win1, 0, 0);
-		cvResizeWindow(win1, 600, 500);
+		cvNamedWindow("Demo", CV_WINDOW_NORMAL);
+		cvMoveWindow("Demo", 0, 0);
+		cvResizeWindow("Demo", 600, 500);
 		cvNamedWindow(win2, CV_WINDOW_NORMAL);
 		cvMoveWindow(win2, 600, 0);
 		cvResizeWindow(win2, 600, 500);
 	}
 
-    double before = get_wall_time();
-	int frames_in = 0;
 
 	if (pthread_mutex_init(&mattex, NULL) != 0)
 	{
@@ -185,26 +192,29 @@ void demo(char *cfgfile, char *weightfile, float thresh, int cam_index, const ch
 		return 1;
 	}
 
-	int exit = 0;
-    while(1){
-        ++frames_in;
+	//if(pthread_create(&detect_thread, 0, detect, 0)) error("Thread creation failed");
+	int frames_in = 0;
+	double before = get_wall_time();
+
+	while (!exit_pending) {
+
+		++frames_in;
 
 		in = get_image_from_stream(cap);
 		if (!in.data) {
 			error("Stream closed.");
+			break;
 		}
 
-		//show_image(in, win1);
-		
+
+		show_image(in, "Demo");
+		show_image(det, win2);
 		int i = cvWaitKey(1);
-		
+		if (i == 27)exit_pending = 1;
 
 		pthread_mutex_lock(&mattex);
 		free_image(in);
 		pthread_mutex_unlock(&mattex);
-
-		if (i == 27)
-			break;
 
 		double after = get_wall_time();
 		if (after - before > 1.) //update every second
@@ -215,22 +225,13 @@ void demo(char *cfgfile, char *weightfile, float thresh, int cam_index, const ch
 			frames_in = 0;
 			printf("\r Stream FPS:%.1f          ", fps);
 		}
+	}
 
-		continue;
-		//in_s = resize_image(in, net.w, net.h);
-		//return 0;
-
-        //if(pthread_create(&fetch_thread, 0, fetch_in_thread, 0)) error("Thread creation failed");
-        //if(pthread_create(&detect_thread, 0, detect_in_thread, 0)) error("Thread creation failed");
-		
-		/*if (disp == in)
-			continue;
-		*/
-
-    }
+//	pthread_join(detect_thread,0);
 
 	cvDestroyAllWindows();
 }
+
 #else
 void demo(char *cfgfile, char *weightfile, float thresh, int cam_index, const char *filename, char **names, int classes, int frame_skip, char *prefix)
 {

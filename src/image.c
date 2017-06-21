@@ -413,7 +413,7 @@ void show_image_cv(image p, const char *name)
 
     IplImage *disp = cvCreateImage(cvSize(p.w,p.h), IPL_DEPTH_8U, p.c);
     int step = disp->widthStep;
-    cvNamedWindow(buff, CV_WINDOW_NORMAL); 
+    //cvNamedWindow(buff, CV_WINDOW_NORMAL); 
     //cvMoveWindow(buff, 100*(windows%10) + 200*(windows/10), 100*(windows%10));
     ++windows;
     for(y = 0; y < p.h; ++y){
@@ -424,40 +424,27 @@ void show_image_cv(image p, const char *name)
         }
     }
     free_image(copy);
-    if(0){
-        int w = 448;
-        int h = w*p.h/p.w;
-        if(h > 1000){
-            h = 1000;
-            w = h*p.w/p.h;
-        }
-        IplImage *buffer = disp;
-        disp = cvCreateImage(cvSize(w, h), buffer->depth, buffer->nChannels);
-        cvResize(buffer, disp, CV_INTER_LINEAR);
-        cvReleaseImage(&buffer);
-    }
-    cvShowImage(buff, disp);
+   
+	cvShowImage(buff, disp);
 
-	{
-		CvSize size;
-		{
-			size.width = disp->width, size.height = disp->height;
-		}
+	//{
 
-		static CvVideoWriter* output_video = NULL;    // cv::VideoWriter output_video;
-		if (output_video == NULL)
-		{
-			printf("\n SRC output_video = %p \n", output_video);
-			const char* output_name = "test_dnn_out.avi";
-			//output_video = cvCreateVideoWriter(output_name, CV_FOURCC('H', '2', '6', '4'), 25, size, 1);
-			output_video = cvCreateVideoWriter(output_name, CV_FOURCC('D', 'I', 'V', 'X'), 25, size, 1);
-			//output_video = cvCreateVideoWriter(output_name, CV_FOURCC('M', 'J', 'P', 'G'), 25, size, 1);
-			printf("\n cvCreateVideoWriter, DST output_video = %p  \n", output_video);
-		}
+	//	static CvVideoWriter* output_video = NULL;    // cv::VideoWriter output_video;
+	//	if (output_video == NULL)
+	//	{
+	//		char fn[255];
+	//		sprintf(fn, "darknet_out_%s.avi", name);
+	//		printf("\n SRC output_video = %p \n", output_video);
+	//		
+	//		//output_video = cvCreateVideoWriter(output_name, CV_FOURCC('H', '2', '6', '4'), 25, size, 1);
+	//		output_video = cvCreateVideoWriter(fn, CV_FOURCC('D', 'I', 'V', 'X'), 25, size, 1);
+	//		//output_video = cvCreateVideoWriter(output_name, CV_FOURCC('M', 'J', 'P', 'G'), 25, size, 1);
+	//		printf("\n cvCreateVideoWriter, DST output_video = %p == %s  \n", output_video, fn);
+	//	}
 
-		cvWriteFrame(output_video, disp);
-		//printf("\n cvWriteFrame \n");
-	}
+	//	cvWriteFrame(output_video, disp);
+	//	//printf("\n cvWriteFrame \n");
+	//}
 
     cvReleaseImage(&disp);
 }
@@ -475,6 +462,46 @@ void show_image(image p, const char *name)
 }
 
 #ifdef OPENCV
+//
+//CvVideoWriter* make_video_writer(const char* name, int w, int h)
+//{
+//	char fn[255];
+//	sprintf(fn, "darknet_out_%s.avi", name);
+//	
+//	CvSize size;
+//	size.width = w;
+//	size.height = h;
+//
+//	return cvCreateVideoWriter(fn, CV_FOURCC('D', 'I', 'V', 'X'), 25, size, 1);
+//}
+//
+//void write_video_frame(CvVideoWriter* writer, image p)
+//{
+//	int x, y, k;
+//	image copy = copy_image(p);
+//	constrain_image(copy);
+//	if (p.c == 3) rgbgr_image(copy);
+//	//normalize_image(copy);
+//
+//	IplImage *disp = cvCreateImage(cvSize(p.w, p.h), IPL_DEPTH_8U, p.c);
+//	int step = disp->widthStep;
+//	//cvNamedWindow(buff, CV_WINDOW_NORMAL); 
+//	//cvMoveWindow(buff, 100*(windows%10) + 200*(windows/10), 100*(windows%10));
+//	++windows;
+//	for (y = 0; y < p.h; ++y) {
+//		for (x = 0; x < p.w; ++x) {
+//			for (k = 0; k < p.c; ++k) {
+//				disp->imageData[y*step + x*p.c + k] = (unsigned char)(get_pixel(copy, x, y, k) * 255);
+//			}
+//		}
+//	}
+//	free_image(copy);
+//
+//	cvWriteFrame(writer, disp);
+//
+//	cvReleaseImage(&disp);
+//
+//}
 
 image ipl_to_image(IplImage* src)
 {
